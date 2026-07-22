@@ -4,8 +4,10 @@ import "./style.css";
 
 type View = "parent" | "teacher" | "canteen" | "admin";
 type MealChoice = { breakfast: boolean; lunch: boolean };
+type MenuItem = { day: string; date: string; breakfast: string; lunch: string; bIcon: string; lIcon: string };
+type MealPrices = { breakfast: number; lunch: number };
 
-const menu = [
+const initialMenu: MenuItem[] = [
   { day: "MON", date: "27", breakfast: "Mini idli & sambar", lunch: "Veg pulao, raita & banana", bIcon: "🥣", lIcon: "🍚" },
   { day: "TUE", date: "28", breakfast: "Aloo paratha & curd", lunch: "Rajma, rice & salad", bIcon: "🫓", lIcon: "🫘" },
   { day: "WED", date: "29", breakfast: "Vegetable poha & milk", lunch: "Chapati, paneer & fruit", bIcon: "🥛", lIcon: "🍛" },
@@ -53,6 +55,8 @@ function App() {
   const [lunchCredits, setLunchCredits] = useState(1);
   const [showTopUp, setShowTopUp] = useState(false);
   const [topUpType, setTopUpType] = useState<"Breakfast" | "Lunch">("Lunch");
+  const [menu, setMenu] = useState<MenuItem[]>(initialMenu);
+  const [prices, setPrices] = useState<MealPrices>({ breakfast: 800, lunch: 1400 });
 
   const selected = menu[day];
 
@@ -90,6 +94,10 @@ function App() {
   function changeView(nextView: View) {
     setView(nextView);
     window.scrollTo({ top: 0 });
+  }
+
+  function updateMenu(index: number, breakfast: string, lunch: string) {
+    setMenu((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, breakfast, lunch } : item));
   }
 
   return (
@@ -149,12 +157,12 @@ function App() {
           </section>
         </section>
       ) : view === "teacher" ? <TeacherView confirmed={confirmed} choice={choice} />
-        : view === "canteen" ? <CanteenView confirmed={confirmed} choice={choice} />
-        : <AdminView />}
+        : view === "canteen" ? <CanteenView confirmed={confirmed} choice={choice} menu={menu} />
+        : <AdminView menu={menu} prices={prices} updateMenu={updateMenu} updatePrices={setPrices} />}
 
       <footer><span>🌱 Less paper</span><span>⏱️ Less work for teachers</span><span>🍱 Less food waste</span></footer>
 
-      {showTopUp && <TopUp type={topUpType} close={() => setShowTopUp(false)} buy={buyCredits} />}
+      {showTopUp && <TopUp type={topUpType} price={topUpType === "Breakfast" ? prices.breakfast : prices.lunch} close={() => setShowTopUp(false)} buy={buyCredits} />}
     </main>
   );
 }
@@ -202,7 +210,7 @@ function TeacherView({ confirmed, choice }: { confirmed: boolean; choice: MealCh
   </section>;
 }
 
-function CanteenView({ confirmed, choice }: { confirmed: boolean; choice: MealChoice }) {
+function CanteenView({ confirmed, choice, menu }: { confirmed: boolean; choice: MealChoice; menu: MenuItem[] }) {
   const gradeBreakfast = 11 + (confirmed && choice.breakfast ? 1 : 0);
   const gradeLunch = 16 + (confirmed && choice.lunch ? 1 : 0);
   const classes = [["Grade 5A",12,18],["Grade 5B",10,16],["Grade 6A",gradeBreakfast,gradeLunch],["Grade 6B",11,17],["Grade 6C",8,15],["Grade 7A",14,20],["Grade 7B",12,19]];
@@ -211,8 +219,8 @@ function CanteenView({ confirmed, choice }: { confirmed: boolean; choice: MealCh
   return <section className="page canteen-page">
     <RoleHeading eyebrow="CANTEEN VIEW" title="Today’s meal count" subtitle="Monday, 27 July · Updates automatically" icon="👩‍🍳" badge="Orders close at 8:00 am" />
     <div className="canteen-meals">
-      <div className="canteen-meal breakfast"><span>🥣</span><div><small>BREAKFAST</small><b>{breakfastTotal} portions</b><p>Mini idli & sambar</p></div></div>
-      <div className="canteen-meal lunch"><span>🍱</span><div><small>LUNCH</small><b>{lunchTotal} portions</b><p>Veg pulao, raita & banana</p></div></div>
+      <div className="canteen-meal breakfast"><span>{menu[0].bIcon}</span><div><small>BREAKFAST</small><b>{breakfastTotal} portions</b><p>{menu[0].breakfast}</p></div></div>
+      <div className="canteen-meal lunch"><span>{menu[0].lIcon}</span><div><small>LUNCH</small><b>{lunchTotal} portions</b><p>{menu[0].lunch}</p></div></div>
       <div className="total-meals"><small>TOTAL TODAY</small><b>{breakfastTotal + lunchTotal}</b><span>meals</span></div>
     </div>
     {confirmed && <div className="role-alert green-alert">✓ Grade 6A count updated from Aanya’s booking</div>}
@@ -225,19 +233,33 @@ function CanteenView({ confirmed, choice }: { confirmed: boolean; choice: MealCh
   </section>;
 }
 
-function AdminView() {
+function AdminView({ menu, prices, updateMenu, updatePrices }: { menu: MenuItem[]; prices: MealPrices; updateMenu: (index: number, breakfast: string, lunch: string) => void; updatePrices: (prices: MealPrices) => void }) {
+  const [editingDay, setEditingDay] = useState<number | null>(null);
+  const [editingPrices, setEditingPrices] = useState(false);
+  const [breakfastDraft, setBreakfastDraft] = useState("");
+  const [lunchDraft, setLunchDraft] = useState("");
+
+  function openDay(index: number) {
+    setBreakfastDraft(menu[index].breakfast);
+    setLunchDraft(menu[index].lunch);
+    setEditingDay(index);
+  }
+
   return <section className="page admin-page">
     <RoleHeading eyebrow="ADMIN VIEW" title="Weekly menu" subtitle="27–31 July 2026" icon="🏫" badge="✓ Published to parents" />
     <section className="admin-menu-panel">
       <div className="panel-title"><div><small>THIS WEEK</small><h2>Breakfast & lunch menu</h2></div><span className="published-badge">PUBLISHED</span></div>
-      <div className="admin-menu-head"><span>DAY</span><span>BREAKFAST</span><span>LUNCH</span></div>
-      {menu.map(item => <div className="admin-menu-row" key={item.day}><div><b>{item.date}</b><small>{item.day}</small></div><span><i>{item.bIcon}</i><b>{item.breakfast}</b></span><span><i>{item.lIcon}</i><b>{item.lunch}</b></span></div>)}
+      <div className="admin-menu-head"><span>DAY</span><span>BREAKFAST</span><span>LUNCH</span><span>ACTION</span></div>
+      {menu.map((item, index) => <div className="admin-menu-row" key={item.day}><div><b>{item.date}</b><small>{item.day}</small></div><span><i>{item.bIcon}</i><b>{item.breakfast}</b></span><span><i>{item.lIcon}</i><b>{item.lunch}</b></span><button aria-label={`Edit ${item.day} menu`} onClick={() => openDay(index)}>✏️ Edit</button></div>)}
     </section>
     <div className="admin-settings">
-      <div><span className="setting-icon orange">🎟️</span><div><small>BREAKFAST PACK</small><b>20 credits · ₹800</b></div></div>
-      <div><span className="setting-icon green">🎫</span><div><small>LUNCH PACK</small><b>20 credits · ₹1,400</b></div></div>
+      <div><span className="setting-icon orange">🎟️</span><div><small>BREAKFAST PACK</small><b>20 credits · ₹{prices.breakfast.toLocaleString("en-IN")}</b></div></div>
+      <div><span className="setting-icon green">🎫</span><div><small>LUNCH PACK</small><b>20 credits · ₹{prices.lunch.toLocaleString("en-IN")}</b></div></div>
       <div><span className="setting-icon purple">⏰</span><div><small>BOOKING DEADLINE</small><b>8:00 am daily</b></div></div>
     </div>
+    <button className="edit-prices-button" onClick={() => setEditingPrices(true)}>✏️ Edit meal prices</button>
+    {editingDay !== null && <MenuEditModal item={menu[editingDay]} breakfast={breakfastDraft} lunch={lunchDraft} setBreakfast={setBreakfastDraft} setLunch={setLunchDraft} close={() => setEditingDay(null)} save={() => { updateMenu(editingDay, breakfastDraft.trim(), lunchDraft.trim()); setEditingDay(null); }} />}
+    {editingPrices && <PriceEditModal prices={prices} close={() => setEditingPrices(false)} save={(nextPrices) => { updatePrices(nextPrices); setEditingPrices(false); }} />}
   </section>;
 }
 
@@ -249,9 +271,19 @@ function SummaryCard({ icon, value, label, tone }: { icon: string; value: number
   return <div className="summary-card"><span className={tone}>{icon}</span><div><b>{value}</b><small>{label}</small></div></div>;
 }
 
-function TopUp({ type, close, buy }: { type: "Breakfast" | "Lunch"; close: () => void; buy: () => void }) {
-  const price = type === "Breakfast" ? "₹800" : "₹1,400";
-  return <div className="modal-bg" onMouseDown={close}><div className="modal" onMouseDown={event => event.stopPropagation()}><button className="close" onClick={close}>×</button><span className="ticket">🎟️</span><small>DEMO PURCHASE</small><h2>Add 20 {type.toLowerCase()} credits</h2><p>No real payment will be charged.</p><div className="purchase-line"><span>{type === "Breakfast" ? "🥞" : "🍛"}<b>{type} Pass<small>20 school meals</small></b></span><strong>{price}</strong></div><button className="buy-button" onClick={buy}>Complete demo purchase →</button></div></div>;
+function MenuEditModal({ item, breakfast, lunch, setBreakfast, setLunch, close, save }: { item: MenuItem; breakfast: string; lunch: string; setBreakfast: (value: string) => void; setLunch: (value: string) => void; close: () => void; save: () => void }) {
+  return <div className="modal-bg" onMouseDown={close}><div className="modal edit-modal" onMouseDown={event => event.stopPropagation()}><button className="close" onClick={close}>×</button><span className="ticket">✏️</span><small>EDIT {item.day} MENU</small><h2>{item.day}, {item.date} July</h2><div className="edit-fields"><label><span>🥞 Breakfast</span><input value={breakfast} onChange={event => setBreakfast(event.target.value)} /></label><label><span>🍛 Lunch</span><input value={lunch} onChange={event => setLunch(event.target.value)} /></label></div><div className="modal-actions"><button onClick={close}>Cancel</button><button disabled={!breakfast.trim() || !lunch.trim()} onClick={save}>Save changes</button></div></div></div>;
+}
+
+function PriceEditModal({ prices, close, save }: { prices: MealPrices; close: () => void; save: (prices: MealPrices) => void }) {
+  const [breakfastPrice, setBreakfastPrice] = useState(String(prices.breakfast));
+  const [lunchPrice, setLunchPrice] = useState(String(prices.lunch));
+  const canSave = Number(breakfastPrice) > 0 && Number(lunchPrice) > 0;
+  return <div className="modal-bg" onMouseDown={close}><div className="modal edit-modal" onMouseDown={event => event.stopPropagation()}><button className="close" onClick={close}>×</button><span className="ticket">₹</span><small>EDIT PRICES</small><h2>Meal credit packs</h2><div className="edit-fields price-fields"><label><span>🥞 Breakfast · 20 credits</span><div><b>₹</b><input aria-label="Breakfast pack price" type="number" min="1" value={breakfastPrice} onChange={event => setBreakfastPrice(event.target.value)} /></div></label><label><span>🍛 Lunch · 20 credits</span><div><b>₹</b><input aria-label="Lunch pack price" type="number" min="1" value={lunchPrice} onChange={event => setLunchPrice(event.target.value)} /></div></label></div><div className="modal-actions"><button onClick={close}>Cancel</button><button disabled={!canSave} onClick={() => save({ breakfast: Number(breakfastPrice), lunch: Number(lunchPrice) })}>Save prices</button></div></div></div>;
+}
+
+function TopUp({ type, price, close, buy }: { type: "Breakfast" | "Lunch"; price: number; close: () => void; buy: () => void }) {
+  return <div className="modal-bg" onMouseDown={close}><div className="modal" onMouseDown={event => event.stopPropagation()}><button className="close" onClick={close}>×</button><span className="ticket">🎟️</span><small>DEMO PURCHASE</small><h2>Add 20 {type.toLowerCase()} credits</h2><p>No real payment will be charged.</p><div className="purchase-line"><span>{type === "Breakfast" ? "🥞" : "🍛"}<b>{type} Pass<small>20 school meals</small></b></span><strong>₹{price.toLocaleString("en-IN")}</strong></div><button className="buy-button" onClick={buy}>Complete demo purchase →</button></div></div>;
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
